@@ -7,21 +7,17 @@ import (
 	"net"
 )
 
-const msgHi = 1
-const msgOwnIP = 2
-const msgPeerIP = 3
+const msgHi = byte(1)
+const msgOwnIP = byte(2)
+const msgPeerIP = byte(3)
 
-type peer struct {
-	net.Addr
-}
-
-var first *peer
-var second *peer
+var first net.Addr
+var second net.Addr
 
 func makeReply(id byte, addr net.Addr) []byte {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, id)
-	binary.Write(buf, binary.LittleEndian, addr.String())
+	binary.Write(buf, binary.LittleEndian, []byte(addr.String()))
 	return buf.Bytes()
 }
 
@@ -34,6 +30,7 @@ func main() {
 		log.Println(err.Error())
 		return
 	}
+	log.Println("Listening on", conn.LocalAddr())
 
 	conn.SetReadBuffer(1048576)
 
@@ -47,6 +44,8 @@ func main() {
 
 		data := buffer[:n]
 
+		log.Println("Received", data, addr)
+
 		r := bytes.NewReader(data)
 
 		var code byte
@@ -54,10 +53,14 @@ func main() {
 
 		if code == msgHi {
 			if first == nil {
-				first = &peer{addr}
-				conn.WriteTo(makeReply(msgOwnIP, first), first)
+				first = addr
+				_, err := conn.WriteTo(makeReply(msgOwnIP, first), first)
+				if err != nil {
+					log.Println(err.Error())
+					return
+				}
 			} else {
-				second = &peer{addr}
+				second = addr
 				conn.WriteTo(makeReply(msgOwnIP, second), second)
 				conn.WriteTo(makeReply(msgPeerIP, second), first)
 				conn.WriteTo(makeReply(msgPeerIP, first), second)
