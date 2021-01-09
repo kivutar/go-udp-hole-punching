@@ -33,9 +33,13 @@ func receiveReply(conn *net.UDPConn) string {
 	r := bytes.NewReader(data)
 
 	var code byte
+	var playerID byte
 	var addr []byte
 	binary.Read(r, binary.LittleEndian, &code)
-	addr = data[1:]
+	if code == msgOwnIP || code == msgPeerIP {
+		binary.Read(r, binary.LittleEndian, &playerID)
+		addr = data[2:]
+	}
 
 	return string(addr)
 }

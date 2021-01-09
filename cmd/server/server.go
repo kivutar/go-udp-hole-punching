@@ -7,16 +7,19 @@ import (
 	"net"
 )
 
-const msgHi = byte(1)
-const msgOwnIP = byte(2)
-const msgPeerIP = byte(3)
+const (
+	msgHi     = byte(1)
+	msgOwnIP  = byte(2)
+	msgPeerIP = byte(3)
+)
 
 var first net.Addr
 var second net.Addr
 
-func makeReply(id byte, addr net.Addr) []byte {
+func makeReply(id byte, playerID byte, addr net.Addr) []byte {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, id)
+	binary.Write(buf, binary.LittleEndian, playerID)
 	binary.Write(buf, binary.LittleEndian, []byte(addr.String()))
 	return buf.Bytes()
 }
@@ -54,16 +57,16 @@ func main() {
 		if code == msgHi {
 			if first == nil {
 				first = addr
-				_, err := conn.WriteTo(makeReply(msgOwnIP, first), first)
+				_, err := conn.WriteTo(makeReply(msgOwnIP, 0, first), first)
 				if err != nil {
 					log.Println(err.Error())
 					return
 				}
 			} else {
 				second = addr
-				conn.WriteTo(makeReply(msgOwnIP, second), second)
-				conn.WriteTo(makeReply(msgPeerIP, second), first)
-				conn.WriteTo(makeReply(msgPeerIP, first), second)
+				conn.WriteTo(makeReply(msgOwnIP, 1, second), second)
+				conn.WriteTo(makeReply(msgPeerIP, 0, second), first)
+				conn.WriteTo(makeReply(msgPeerIP, 1, first), second)
 				first = nil
 				second = nil
 			}
