@@ -8,9 +8,8 @@ import (
 )
 
 const (
-	msgHi     = byte(1)
-	msgOwnIP  = byte(2)
-	msgPeerIP = byte(3)
+	msgHi = byte(1)
+	msgIP = byte(2)
 )
 
 var first net.Addr
@@ -57,16 +56,16 @@ func main() {
 		if code == msgHi {
 			if first == nil {
 				first = addr
-				_, err := conn.WriteTo(makeReply(msgOwnIP, 0, first), first)
+				_, err := conn.WriteTo(makeReply(msgIP, 0, first), first)
 				if err != nil {
 					log.Println(err.Error())
 					return
 				}
 			} else {
 				second = addr
-				conn.WriteTo(makeReply(msgOwnIP, 1, second), second)
-				conn.WriteTo(makeReply(msgPeerIP, 0, second), first)
-				conn.WriteTo(makeReply(msgPeerIP, 1, first), second)
+				conn.WriteTo(makeReply(msgIP, 1, second), second)
+				conn.WriteTo(makeReply(msgIP, 1, second), first)
+				conn.WriteTo(makeReply(msgIP, 0, first), second)
 				first = nil
 				second = nil
 			}

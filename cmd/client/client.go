@@ -9,9 +9,10 @@ import (
 	"strconv"
 )
 
-const msgHi = byte(1)
-const msgOwnIP = byte(2)
-const msgPeerIP = byte(3)
+const (
+	msgHi = byte(1)
+	msgIP = byte(2)
+)
 
 func makeHi() []byte {
 	buf := new(bytes.Buffer)
@@ -19,12 +20,11 @@ func makeHi() []byte {
 	return buf.Bytes()
 }
 
-func receiveReply(conn *net.UDPConn) string {
+func receiveReply(conn *net.UDPConn) (int, string, error) {
 	buffer := make([]byte, 1024)
 	n, err := conn.Read(buffer)
 	if err != nil {
-		log.Println(err.Error())
-		return ""
+		return 0, "", err
 	}
 	data := buffer[:n]
 
@@ -36,12 +36,13 @@ func receiveReply(conn *net.UDPConn) string {
 	var playerID byte
 	var addr []byte
 	binary.Read(r, binary.LittleEndian, &code)
-	if code == msgOwnIP || code == msgPeerIP {
+	if code == msgIP {
 		binary.Read(r, binary.LittleEndian, &playerID)
 		addr = data[2:]
+		return int(playerID), string(addr), nil
 	}
 
-	return string(addr)
+	return 0, "", nil
 }
 
 func main() {
@@ -63,8 +64,8 @@ func main() {
 		return
 	}
 
-	my := receiveReply(rdv)
-	log.Println("I am", my)
+	myID, my, _ := receiveReply(rdv)
+	log.Println("I am", my, ", Player #", myID)
 
 	myIP, myPortStr, err := net.SplitHostPort(my)
 	if err != nil {
@@ -73,8 +74,8 @@ func main() {
 	}
 	myPort, _ := strconv.ParseInt(myPortStr, 10, 64)
 
-	peer := receiveReply(rdv)
-	log.Println("I see", peer)
+	peerID, peer, _ := receiveReply(rdv)
+	log.Println("I see", peer, ", Player #", peerID)
 
 	peerIP, peerPortStr, err := net.SplitHostPort(peer)
 	if err != nil {
@@ -109,7 +110,7 @@ func main() {
 	}
 
 	for {
-		msg := receiveReply(p2p)
+		_, msg, _ := receiveReply(p2p)
 		log.Println(msg)
 		return
 	}
