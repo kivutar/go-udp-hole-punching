@@ -10,13 +10,13 @@ import (
 )
 
 const (
-	msgHi = byte(1)
-	msgIP = byte(2)
+	msgJoin = byte(1)
+	msgIP   = byte(2)
 )
 
-func makeHi() []byte {
+func makeJoin() []byte {
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, msgHi)
+	binary.Write(buf, binary.LittleEndian, msgJoin)
 	return buf.Bytes()
 }
 
@@ -58,7 +58,7 @@ func main() {
 
 	rdv.SetReadBuffer(1048576)
 
-	_, err = rdv.Write(makeHi())
+	_, err = rdv.Write(makeJoin())
 	if err != nil {
 		log.Println(err.Error())
 		return
@@ -103,7 +103,7 @@ func main() {
 	p2p.SetReadBuffer(1048576)
 
 	log.Println("Sending hello")
-	_, err = p2p.WriteTo(makeHi(), peerAddr)
+	_, err = p2p.WriteTo(makeJoin(), peerAddr)
 	if err != nil {
 		log.Println(err.Error())
 		return
