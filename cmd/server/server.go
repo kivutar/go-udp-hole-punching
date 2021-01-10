@@ -3,24 +3,28 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"log"
 	"net"
 	"time"
 )
 
+// Network code indicating the type of message.
 const (
-	msgJoin      = byte(1)
-	msgOwnIP     = byte(2)
-	msgPeerIP    = byte(3)
-	msgHandshake = byte(4)
+	MsgCodeJoin      = byte(1) // Create or join a netplay room
+	MsgCodeOwnIP     = byte(2) // Get to know your own external IP as well as your player index
+	MsgCodePeerIP    = byte(3) // Get the IP of your peer, along with its player index
+	MsgCodeHandshake = byte(4) // For both peer to contact each others
 )
 
+// Room is a game room where 2 players connect
 type Room struct {
 	CRC       uint32
 	Players   []net.Addr
 	CreatedAt time.Time
 }
 
+// Rooms is the list of rooms
 var Rooms []Room
 
 func findRoom(crc uint32, addr net.Addr) *Room {
@@ -59,16 +63,16 @@ func receive(conn *net.UDPConn) error {
 	binary.Read(r, binary.LittleEndian, &code)
 
 	switch code {
-	case msgJoin:
+	case MsgCodeJoin:
 		var crc uint32
 		binary.Read(r, binary.LittleEndian, &crc)
 		room := findRoom(crc, addr)
 
 		if room != nil {
 			room.Players = append(room.Players, addr)
-			conn.WriteTo(makeReply(msgOwnIP, 1, room.Players[1]), room.Players[1])
-			conn.WriteTo(makeReply(msgPeerIP, 1, room.Players[1]), room.Players[0])
-			conn.WriteTo(makeReply(msgPeerIP, 0, room.Players[0]), room.Players[1])
+			conn.WriteTo(makeReply(MsgCodeOwnIP, 1, room.Players[1]), room.Players[1])
+			conn.WriteTo(makeReply(MsgCodePeerIP, 1, room.Players[1]), room.Players[0])
+			conn.WriteTo(makeReply(MsgCodePeerIP, 0, room.Players[0]), room.Players[1])
 			log.Println("Player", addr, "Joined room", *room)
 		} else {
 			room := Room{
@@ -77,14 +81,14 @@ func receive(conn *net.UDPConn) error {
 				CreatedAt: time.Now(),
 			}
 			Rooms = append(Rooms, room)
-			_, err := conn.WriteTo(makeReply(msgOwnIP, 0, room.Players[0]), room.Players[0])
+			_, err := conn.WriteTo(makeReply(MsgCodeOwnIP, 0, room.Players[0]), room.Players[0])
 			if err != nil {
 				return err
 			}
 			log.Println("Player", addr, "created room", room)
 		}
 	default:
-		log.Println("Received unknown message")
+		return errors.New("Received unknown message")
 	}
 
 	return nil

@@ -9,22 +9,24 @@ import (
 	"strconv"
 )
 
+// Network code indicating the type of message.
 const (
-	msgJoin      = byte(1)
-	msgIP        = byte(2)
-	msgHandshake = byte(3)
+	MsgCodeJoin      = byte(1) // Create or join a netplay room
+	MsgCodeOwnIP     = byte(2) // Get to know your own external IP as well as your player index
+	MsgCodePeerIP    = byte(3) // Get the IP of your peer, along with its player index
+	MsgCodeHandshake = byte(4) // For both peer to contact each others
 )
 
-func makeJoin(crc uint32) []byte {
+func makeJoinPacket(crc uint32) []byte {
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, msgJoin)
+	binary.Write(buf, binary.LittleEndian, MsgCodeJoin)
 	binary.Write(buf, binary.LittleEndian, crc)
 	return buf.Bytes()
 }
 
-func makeHandshake() []byte {
+func makeHandshakePacket() []byte {
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, msgHandshake)
+	binary.Write(buf, binary.LittleEndian, MsgCodeHandshake)
 	return buf.Bytes()
 }
 
@@ -43,7 +45,7 @@ func receiveReply(conn *net.UDPConn) (int, string, error) {
 	var code byte
 
 	binary.Read(r, binary.LittleEndian, &code)
-	if code == msgIP {
+	if code == MsgCodeOwnIP || code == MsgCodePeerIP {
 		var playerID byte
 		binary.Read(r, binary.LittleEndian, &playerID)
 		addr := data[2:]
@@ -66,7 +68,7 @@ func main() {
 
 	rdv.SetReadBuffer(1048576)
 
-	_, err = rdv.Write(makeJoin(42))
+	_, err = rdv.Write(makeJoinPacket(42))
 	if err != nil {
 		log.Println(err.Error())
 		return
@@ -111,7 +113,7 @@ func main() {
 	p2p.SetReadBuffer(1048576)
 
 	log.Println("Sending hello")
-	_, err = p2p.WriteTo(makeHandshake(), peerAddr)
+	_, err = p2p.WriteTo(makeHandshakePacket(), peerAddr)
 	if err != nil {
 		log.Println(err.Error())
 		return
