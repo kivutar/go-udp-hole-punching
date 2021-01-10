@@ -10,8 +10,9 @@ import (
 
 const (
 	msgJoin      = byte(1)
-	msgIP        = byte(2)
-	msgHandshake = byte(3)
+	msgOwnIP     = byte(2)
+	msgPeerIP    = byte(3)
+	msgHandshake = byte(4)
 )
 
 type Room struct {
@@ -65,9 +66,9 @@ func receive(conn *net.UDPConn) error {
 
 		if room != nil {
 			room.Players = append(room.Players, addr)
-			conn.WriteTo(makeReply(msgIP, 1, room.Players[1]), room.Players[1])
-			conn.WriteTo(makeReply(msgIP, 1, room.Players[1]), room.Players[0])
-			conn.WriteTo(makeReply(msgIP, 0, room.Players[0]), room.Players[1])
+			conn.WriteTo(makeReply(msgOwnIP, 1, room.Players[1]), room.Players[1])
+			conn.WriteTo(makeReply(msgPeerIP, 1, room.Players[1]), room.Players[0])
+			conn.WriteTo(makeReply(msgPeerIP, 0, room.Players[0]), room.Players[1])
 			log.Println("Player", addr, "Joined room", *room)
 		} else {
 			room := Room{
@@ -76,7 +77,7 @@ func receive(conn *net.UDPConn) error {
 				CreatedAt: time.Now(),
 			}
 			Rooms = append(Rooms, room)
-			_, err := conn.WriteTo(makeReply(msgIP, 0, room.Players[0]), room.Players[0])
+			_, err := conn.WriteTo(makeReply(msgOwnIP, 0, room.Players[0]), room.Players[0])
 			if err != nil {
 				return err
 			}
