@@ -5,15 +5,33 @@ import (
 	"encoding/binary"
 	"log"
 	"net"
+	"time"
 )
 
 const (
-	msgJoin = byte(1)
-	msgIP   = byte(2)
+	msgJoin      = byte(1)
+	msgIP        = byte(2)
+	msgHandshake = byte(3)
 )
 
-var first net.Addr
-var second net.Addr
+type Room struct {
+	CRC       uint32
+	Players   []net.Addr
+	CreatedAt time.Time
+}
+
+var Rooms []Room
+
+func findRoom(crc uint32, addr net.Addr) *Room {
+	for _, r := range Rooms {
+		if r.CRC == crc &&
+			len(r.Players) == 1 && r.Players[0] != addr &&
+			r.CreatedAt.Before(time.Now().Add(time.Minute*2)) {
+			return &r
+		}
+	}
+	return nil
+}
 
 func makeReply(id byte, playerID byte, addr net.Addr) []byte {
 	buf := new(bytes.Buffer)
@@ -41,19 +59,28 @@ func receive(conn *net.UDPConn) error {
 
 	switch code {
 	case msgJoin:
-		if first == nil {
-			first = addr
-			_, err := conn.WriteTo(makeReply(msgIP, 0, first), first)
+		var crc uint32
+		binary.Read(r, binary.LittleEndian, &crc)
+		room := findRoom(crc, addr)
+
+		if room != nil {
+			room.Players = append(room.Players, addr)
+			conn.WriteTo(makeReply(msgIP, 1, room.Players[1]), room.Players[1])
+			conn.WriteTo(makeReply(msgIP, 1, room.Players[1]), room.Players[0])
+			conn.WriteTo(makeReply(msgIP, 0, room.Players[0]), room.Players[1])
+			log.Println("Player", addr, "Joined room", *room)
+		} else {
+			room := Room{
+				CRC:       crc,
+				Players:   []net.Addr{addr},
+				CreatedAt: time.Now(),
+			}
+			Rooms = append(Rooms, room)
+			_, err := conn.WriteTo(makeReply(msgIP, 0, room.Players[0]), room.Players[0])
 			if err != nil {
 				return err
 			}
-		} else {
-			second = addr
-			conn.WriteTo(makeReply(msgIP, 1, second), second)
-			conn.WriteTo(makeReply(msgIP, 1, second), first)
-			conn.WriteTo(makeReply(msgIP, 0, first), second)
-			first = nil
-			second = nil
+			log.Println("Player", addr, "created room", room)
 		}
 	default:
 		log.Println("Received unknown message")

@@ -10,13 +10,21 @@ import (
 )
 
 const (
-	msgJoin = byte(1)
-	msgIP   = byte(2)
+	msgJoin      = byte(1)
+	msgIP        = byte(2)
+	msgHandshake = byte(3)
 )
 
-func makeJoin() []byte {
+func makeJoin(crc uint32) []byte {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, msgJoin)
+	binary.Write(buf, binary.LittleEndian, crc)
+	return buf.Bytes()
+}
+
+func makeHandshake() []byte {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, msgHandshake)
 	return buf.Bytes()
 }
 
@@ -33,12 +41,12 @@ func receiveReply(conn *net.UDPConn) (int, string, error) {
 	r := bytes.NewReader(data)
 
 	var code byte
-	var playerID byte
-	var addr []byte
+
 	binary.Read(r, binary.LittleEndian, &code)
 	if code == msgIP {
+		var playerID byte
 		binary.Read(r, binary.LittleEndian, &playerID)
-		addr = data[2:]
+		addr := data[2:]
 		return int(playerID), string(addr), nil
 	}
 
@@ -58,7 +66,7 @@ func main() {
 
 	rdv.SetReadBuffer(1048576)
 
-	_, err = rdv.Write(makeJoin())
+	_, err = rdv.Write(makeJoin(42))
 	if err != nil {
 		log.Println(err.Error())
 		return
@@ -103,7 +111,7 @@ func main() {
 	p2p.SetReadBuffer(1048576)
 
 	log.Println("Sending hello")
-	_, err = p2p.WriteTo(makeJoin(), peerAddr)
+	_, err = p2p.WriteTo(makeHandshake(), peerAddr)
 	if err != nil {
 		log.Println(err.Error())
 		return
