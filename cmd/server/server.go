@@ -31,7 +31,7 @@ func findRoom(crc uint32, addr net.Addr) *Room {
 	for _, r := range Rooms {
 		if r.CRC == crc &&
 			len(r.Players) == 1 && r.Players[0] != addr &&
-			r.CreatedAt.Before(time.Now().Add(time.Minute*2)) {
+			r.CreatedAt.After(time.Now().Add(-time.Minute)) {
 			return &r
 		}
 	}
