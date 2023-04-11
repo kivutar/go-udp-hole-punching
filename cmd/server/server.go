@@ -11,10 +11,10 @@ import (
 
 // Network code indicating the type of message.
 const (
-	MsgCodeJoin      = byte(1) // Create or join a netplay room
-	MsgCodeOwnIP     = byte(2) // Get to know your own external IP as well as your player index
-	MsgCodePeerIP    = byte(3) // Get the IP of your peer, along with its player index
-	MsgCodeHandshake = byte(4) // For both peer to contact each others
+	MsgCodeJoin      = uint16(8)  // Create or join a netplay room
+	MsgCodeOwnIP     = uint16(9)  // Get to know your own external IP as well as your player index
+	MsgCodePeerIP    = uint16(10) // Get the IP of your peer, along with its player index
+	MsgCodeHandshake = uint16(11) // For both peer to contact each others
 )
 
 // Room is a game room where 2 players connect
@@ -38,8 +38,9 @@ func findRoom(crc uint32, addr net.Addr) *Room {
 	return nil
 }
 
-func makeReply(id byte, playerID byte, addr net.Addr) []byte {
+func makeReply(id uint16, playerID byte, addr net.Addr) []byte {
 	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, uint32(0))
 	binary.Write(buf, binary.LittleEndian, id)
 	binary.Write(buf, binary.LittleEndian, playerID)
 	binary.Write(buf, binary.LittleEndian, []byte(addr.String()))
@@ -59,7 +60,10 @@ func receive(conn *net.UDPConn) error {
 
 	r := bytes.NewReader(data)
 
-	var code byte
+	var zeros uint32
+	binary.Read(r, binary.LittleEndian, &zeros)
+
+	var code uint16
 	binary.Read(r, binary.LittleEndian, &code)
 
 	switch code {
@@ -73,7 +77,7 @@ func receive(conn *net.UDPConn) error {
 			conn.WriteTo(makeReply(MsgCodeOwnIP, 1, room.Players[1]), room.Players[1])
 			conn.WriteTo(makeReply(MsgCodePeerIP, 1, room.Players[1]), room.Players[0])
 			conn.WriteTo(makeReply(MsgCodePeerIP, 0, room.Players[0]), room.Players[1])
-			log.Println("Player", addr, "Joined room", *room)
+			log.Println("Player", addr, "joined room", *room)
 		} else {
 			room := Room{
 				CRC:       crc,
