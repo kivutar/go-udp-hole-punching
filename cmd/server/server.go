@@ -77,10 +77,13 @@ func receive(conn *net.UDPConn) error {
 			log.Println("Player", addr, "joined room", *room)
 			log.Println("We now have", len(*room.Players), "players in room")
 			log.Println(*room.Players)
+			id := len(*room.Players) - 1
 			for _, player := range *room.Players {
 				if player == addr {
-					log.Println("-- Replying", "MsgCodeOwnIP", byte(len(*room.Players)-1), addr, "to", player)
-					conn.WriteTo(makeReply(MsgCodeOwnIP, byte(len(*room.Players)-1), addr), player)
+					// sending own IP to newcomer
+					log.Println("-- Replying", "MsgCodeOwnIP", byte(id), addr, "to", player)
+					conn.WriteTo(makeReply(MsgCodeOwnIP, byte(id), addr), player)
+					// also send the players already in the room to newcomer
 					for i, player2 := range *room.Players {
 						if player2 != addr {
 							log.Println("---- Replying", "MsgCodePeerIP", byte(i), player2, "to", player)
@@ -88,13 +91,11 @@ func receive(conn *net.UDPConn) error {
 						}
 					}
 				} else {
-					log.Println("-- Replying", "MsgCodePeerIP", byte(len(*room.Players)-1), addr, "to", player)
-					conn.WriteTo(makeReply(MsgCodePeerIP, byte(len(*room.Players)-1), addr), player)
+					// send the address of the newcomer to everyone in the room
+					log.Println("-- Replying", "MsgCodePeerIP", byte(id), addr, "to", player)
+					conn.WriteTo(makeReply(MsgCodePeerIP, byte(id), addr), player)
 				}
 			}
-			// conn.WriteTo(makeReply(MsgCodeOwnIP, 1, room.Players[1]), room.Players[1])
-			// conn.WriteTo(makeReply(MsgCodePeerIP, 1, room.Players[1]), room.Players[0])
-			// conn.WriteTo(makeReply(MsgCodePeerIP, 0, room.Players[0]), room.Players[1])
 		} else {
 			room := Room{
 				CRC:       crc,
