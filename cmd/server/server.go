@@ -20,7 +20,7 @@ const (
 // Room is a game room where 2 players connect
 type Room struct {
 	CRC       uint32
-	Players   []net.Addr
+	Players   *[]net.Addr
 	CreatedAt time.Time
 }
 
@@ -30,7 +30,7 @@ var Rooms []Room
 func findRoom(crc uint32, addr net.Addr) *Room {
 	for _, r := range Rooms {
 		if r.CRC == crc &&
-			len(r.Players) == 1 && r.Players[0] != addr &&
+			len(*r.Players) > 0 &&
 			r.CreatedAt.After(time.Now().Add(-time.Minute)) {
 			return &r
 		}
@@ -73,23 +73,42 @@ func receive(conn *net.UDPConn) error {
 		room := findRoom(crc, addr)
 
 		if room != nil {
-			room.Players = append(room.Players, addr)
-			conn.WriteTo(makeReply(MsgCodeOwnIP, 1, room.Players[1]), room.Players[1])
-			conn.WriteTo(makeReply(MsgCodePeerIP, 1, room.Players[1]), room.Players[0])
-			conn.WriteTo(makeReply(MsgCodePeerIP, 0, room.Players[0]), room.Players[1])
+			*room.Players = append(*room.Players, addr)
 			log.Println("Player", addr, "joined room", *room)
+			log.Println("We now have", len(*room.Players), "players in room")
+			log.Println(*room.Players)
+			for _, player := range *room.Players {
+				if player == addr {
+					log.Println("-- Replying", "MsgCodeOwnIP", byte(len(*room.Players)-1), addr, "to", player)
+					conn.WriteTo(makeReply(MsgCodeOwnIP, byte(len(*room.Players)-1), addr), player)
+					for i, player2 := range *room.Players {
+						if player2 != addr {
+							log.Println("---- Replying", "MsgCodePeerIP", byte(i), player2, "to", player)
+							conn.WriteTo(makeReply(MsgCodePeerIP, byte(i), player2), player)
+						}
+					}
+				} else {
+					log.Println("-- Replying", "MsgCodePeerIP", byte(len(*room.Players)-1), addr, "to", player)
+					conn.WriteTo(makeReply(MsgCodePeerIP, byte(len(*room.Players)-1), addr), player)
+				}
+			}
+			// conn.WriteTo(makeReply(MsgCodeOwnIP, 1, room.Players[1]), room.Players[1])
+			// conn.WriteTo(makeReply(MsgCodePeerIP, 1, room.Players[1]), room.Players[0])
+			// conn.WriteTo(makeReply(MsgCodePeerIP, 0, room.Players[0]), room.Players[1])
 		} else {
 			room := Room{
 				CRC:       crc,
-				Players:   []net.Addr{addr},
+				Players:   &[]net.Addr{addr},
 				CreatedAt: time.Now(),
 			}
 			Rooms = append(Rooms, room)
-			_, err := conn.WriteTo(makeReply(MsgCodeOwnIP, 0, room.Players[0]), room.Players[0])
+			log.Println("Player", addr, "created room", room)
+			log.Println("We now have", len(*room.Players), "players in room")
+			log.Println("-- Replying", "MsgCodeOwnIP", 0, addr, "to", addr)
+			_, err := conn.WriteTo(makeReply(MsgCodeOwnIP, 0, addr), addr)
 			if err != nil {
 				return err
 			}
-			log.Println("Player", addr, "created room", room)
 		}
 	default:
 		return errors.New("Received unknown message")
