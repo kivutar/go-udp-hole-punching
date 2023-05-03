@@ -31,7 +31,7 @@ func findRoom(crc uint32, addr net.Addr) *Room {
 	for _, r := range Rooms {
 		if r.CRC == crc &&
 			len(*r.Players) > 0 &&
-			r.CreatedAt.After(time.Now().Add(-time.Minute)) {
+			r.CreatedAt.After(time.Now().Add(-time.Minute*2)) {
 			return &r
 		}
 	}
@@ -44,6 +44,8 @@ func makeReply(id byte, playerID byte, addr net.Addr) []byte {
 	binary.Write(buf, binary.LittleEndian, id)
 	binary.Write(buf, binary.LittleEndian, playerID)
 	binary.Write(buf, binary.LittleEndian, []byte(addr.String()))
+	binary.Write(buf, binary.LittleEndian, byte(0))
+	log.Println(buf.Bytes())
 	return buf.Bytes()
 }
 
