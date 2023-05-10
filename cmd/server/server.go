@@ -38,11 +38,12 @@ func findRoom(crc uint32, addr net.Addr) *Room {
 	return nil
 }
 
-func makeReply(id byte, playerID byte, addr net.Addr) []byte {
+func makeReply(id byte, playerID byte, roomSize byte, addr net.Addr) []byte {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, uint32(0))
 	binary.Write(buf, binary.LittleEndian, id)
 	binary.Write(buf, binary.LittleEndian, playerID)
+	binary.Write(buf, binary.LittleEndian, roomSize)
 	binary.Write(buf, binary.LittleEndian, []byte(addr.String()))
 	binary.Write(buf, binary.LittleEndian, byte(0))
 	log.Println(buf.Bytes())
@@ -84,18 +85,18 @@ func receive(conn *net.UDPConn) error {
 				if player == addr {
 					// sending own IP to newcomer
 					log.Println("-- Replying", "MsgCodeOwnIP", byte(id), addr, "to", player)
-					conn.WriteTo(makeReply(MsgCodeOwnIP, byte(id), addr), player)
+					conn.WriteTo(makeReply(MsgCodeOwnIP, byte(id), byte(len(*room.Players)), addr), player)
 					// also send the players already in the room to newcomer
 					for i, player2 := range *room.Players {
 						if player2 != addr {
 							log.Println("---- Replying", "MsgCodePeerIP", byte(i), player2, "to", player)
-							conn.WriteTo(makeReply(MsgCodePeerIP, byte(i), player2), player)
+							conn.WriteTo(makeReply(MsgCodePeerIP, byte(i), byte(len(*room.Players)), player2), player)
 						}
 					}
 				} else {
 					// send the address of the newcomer to everyone in the room
 					log.Println("-- Replying", "MsgCodePeerIP", byte(id), addr, "to", player)
-					conn.WriteTo(makeReply(MsgCodePeerIP, byte(id), addr), player)
+					conn.WriteTo(makeReply(MsgCodePeerIP, byte(id), byte(len(*room.Players)), addr), player)
 				}
 			}
 		} else {
@@ -108,7 +109,7 @@ func receive(conn *net.UDPConn) error {
 			log.Println("Player", addr, "created room", room)
 			log.Println("We now have", len(*room.Players), "players in room")
 			log.Println("-- Replying", "MsgCodeOwnIP", 0, addr, "to", addr)
-			_, err := conn.WriteTo(makeReply(MsgCodeOwnIP, 0, addr), addr)
+			_, err := conn.WriteTo(makeReply(MsgCodeOwnIP, 0, byte(len(*room.Players)), addr), addr)
 			if err != nil {
 				return err
 			}
